@@ -27,6 +27,52 @@ Die Kennlinie ist **logarithmisch**: Jede Dekade der Dosisleistung entspricht et
 
 Die Taster brauchen keine externen Widerstände, die internen Pull-ups sind aktiv.
 
+## Anschluss an das 6150AD2
+
+Der Arduino wird **nicht direkt** an das Messgerät angeschlossen. Dazwischen sitzt die Platine der Automess-Simulationssonde **6150AD-20** (Leiterplatte 700.15.01/2). Sie wird über das normale Sondenkabel (6 Adern + Schirm, 1,25 m) mit dem 6150AD2 verbunden und meldet sich dort als externe Sonde an. Der Arduino ersetzt den Pulsgenerator, der laut Automess an diese Platine angeschlossen wird.
+
+```
+Arduino Pin 13 ──── Pulseingang der Simulationssonden-Platine (Ader braun)
+Arduino GND    ──── Masse (Ader schwarz / Kabelschirm)
+                    Simulationssonden-Platine ════ Sondenkabel ════ 6150AD2
+```
+
+| Ader | Funktion |
+|---|---|
+| braun | Zählimpulse |
+| schwarz | Masse, kein eigener Pin, über den Kabelschirm |
+| grün | 4,75 V Versorgung aus dem 6150AD2 für die Sondenplatine |
+| weiß, gelb | Erkennung der Sonde durch das 6150AD2 |
+| übrige 2 Pins | Sonderfunktionen des 6150AD2, **dürfen nicht angeschlossen werden** |
+
+**Pulsvorgabe von Automess:** 10 … 30 µs lang, Pegel 0 V / 4,75 V (5 V ± 10 %). Dieser Simulator liefert 20 µs. In der Automess-Skizze ruht die Leitung auf HIGH und der Puls geht nach LOW; der Arduino gibt dagegen LOW in Ruhe und HIGH-Pulse aus. Am 6150AD2 funktioniert das in der Praxis.
+
+### Sondencodierung
+
+Auf der Simulationssonden-Platine wird der Sondentyp mit Lötbrücken der Wertigkeit 1, 2, 4, 8, 16, 32 eingestellt. Der Code muss zur Seriennummer des Messgeräts passen:
+
+| Code | gesetzte Brücken | Messgerät |
+|---|---|---|
+| 20 | 4 + 16 | 6150AD1 sowie 6150AD2 mit Seriennummer **unter 65602** |
+| 23 | 1 + 2 + 4 + 16 | 6150AD2 mit Seriennummer **ab 65602** |
+
+### Anzeige abhängig von der Pulsrate
+
+Herstellerangabe von Automess (17.08.1989) für das 6150AD2:
+
+| Pulse/s | Anzeige | | Pulse/s | Anzeige |
+|---|---|---|---|---|
+| 1 | 0,41 µSv/h | | 3 000 | 2,24 mSv/h |
+| 3 | 1,63 µSv/h | | 4 000 | 3,20 mSv/h |
+| 10 | 6,00 µSv/h | | 5 000 | 4,30 mSv/h |
+| 30 | 18,5 µSv/h | | 6 000 | 5,63 mSv/h |
+| 100 | 62,3 µSv/h | | 7 000 | 7,12 mSv/h |
+| 300 | 189 µSv/h | | 8 000 | 9,00 mSv/h |
+| 1 000 | 655 µSv/h | | 8 250 | 9,50 mSv/h |
+| 2 000 | 1,40 mSv/h | | 8 500 | Überlauf |
+
+Bei kleinen Raten zeigt das Gerät wegen des Hintergrundabzugs weniger an, bei großen Raten wegen der Totzeitkorrektur mehr, als ein linearer Zusammenhang ergäbe.
+
 ## Bauen und Hochladen
 
 Voraussetzung ist [PlatformIO](https://platformio.org/) (Kommandozeile oder die VS-Code-Erweiterung).
@@ -71,6 +117,7 @@ Details zu Timer, Pulserzeugung und Genauigkeit stehen in [docs/technik.md](docs
 ## Hinweise
 
 - Das 6150AD2 braucht Pulse von 20 µs Länge, damit es die Zerfälle einer externen Sonde erkennt. Die Pulsbreite darf deshalb nicht verändert werden.
+- Laut Automess-Tabelle bedeuten 8 500 Pulse/s bereits Überlauf und 1 Puls/s nur 0,41 µSv/h. Die Eckwerte der Kennlinie oben (1 µSv/h bzw. 9,9 mSv/h) wurden dagegen empirisch mit der Version von 2019 ermittelt, die am Endwert nur 8 333 Pulse/s erreichte. Am Endwert kann diese Version daher Überlauf anzeigen; mit `PULS_MAX = 8333.0` in [src/main.cpp](src/main.cpp) verhält sie sich dort wie die alte Version.
 - Bei hohen Pulsraten zeigt diese Version etwas mehr an als die ursprüngliche Version von 2019 (bis ca. 14 % zwischen 1 und 9,9 mSv/h). Die alte Version konnte dort nur in Stufen zählen. Siehe [docs/technik.md](docs/technik.md#unterschied-zur-version-von-2019).
 - Der Simulator ersetzt keine Kalibrierung des Messgeräts mit einer echten Quelle.
 
